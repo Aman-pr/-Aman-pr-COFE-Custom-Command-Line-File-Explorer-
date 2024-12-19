@@ -26,20 +26,54 @@ public class Main {
                 StringBuilder result = new StringBuilder();
                 boolean inQuotes = false;
                 char quoteType = 0;
+                boolean lastWasQuote = false;  // Track if we just ended a quote
                 
                 for (int i = 0; i < echoText.length(); i++) {
                     char c = echoText.charAt(i);
                     
-                    if ((c == '\'' || c == '"') && !inQuotes) {
-                        inQuotes = true;
-                        quoteType = c;
-                        continue;
-                    } else if (c == quoteType && inQuotes) {
-                        inQuotes = false;
-                        quoteType = 0;
+                    // Handle quotes
+                    if ((c == '\'' || c == '"') && (i == 0 || echoText.charAt(i - 1) != '\\')) {
+                        if (!inQuotes) {
+                            if (lastWasQuote && result.length() > 0 && result.charAt(result.length() - 1) != ' ') {
+                                result.append(' ');
+                            }
+                            inQuotes = true;
+                            quoteType = c;
+                            lastWasQuote = false;
+                            continue;
+                        } else if (c == quoteType) {
+                            inQuotes = false;
+                            quoteType = 0;
+                            lastWasQuote = true;
+                            continue;
+                        }
+                    }
+                    
+                    // Handle backslashes
+                    if (c == '\\') {
+                        if (inQuotes) {
+                            // Within quotes, preserve backslashes
+                            result.append(c);
+                        } else {
+                            // Outside quotes, check next character
+                            if (i + 1 < echoText.length()) {
+                                char nextChar = echoText.charAt(i + 1);
+                                if (nextChar == ' ' || nextChar == '\\') {
+                                    // Convert to space for space or backslash
+                                    result.append(' ');
+                                    if (nextChar == ' ') i++; // Skip next space
+                                } else {
+                                    // For other characters after backslash, just append the character
+                                    result.append(nextChar);
+                                    i++; // Skip the escaped character
+                                }
+                            }
+                        }
+                        lastWasQuote = false;
                         continue;
                     }
                     
+                    // Handle spaces between quotes
                     if (c == ' ' && !inQuotes) {
                         if (result.length() > 0 && result.charAt(result.length() - 1) != ' ') {
                             result.append(' ');
@@ -47,6 +81,7 @@ public class Main {
                     } else {
                         result.append(c);
                     }
+                    lastWasQuote = false;
                 }
                 
                 System.out.println(result.toString().trim());
