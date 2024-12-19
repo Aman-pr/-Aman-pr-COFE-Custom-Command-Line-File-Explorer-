@@ -26,7 +26,7 @@ public class Main {
                 StringBuilder result = new StringBuilder();
                 boolean inQuotes = false;
                 char quoteType = 0;
-                boolean lastWasQuote = false;  // Track if we just ended a quote
+                boolean lastWasQuote = false;
                 
                 for (int i = 0; i < echoText.length(); i++) {
                     char c = echoText.charAt(i);
@@ -49,12 +49,18 @@ public class Main {
                         }
                     }
                     
+                    // For single quotes, preserve everything literally
+                    if (inQuotes && quoteType == '\'') {
+                        result.append(c);
+                        continue;
+                    }
+                    
                     // Handle backslashes
                     if (c == '\\') {
-                        if (inQuotes) {
-                            // Within quotes, preserve backslashes
+                        if (inQuotes && quoteType == '"') {
+                            // Within double quotes, preserve backslashes
                             result.append(c);
-                        } else {
+                        } else if (!inQuotes) {
                             // Outside quotes, check next character
                             if (i + 1 < echoText.length()) {
                                 char nextChar = echoText.charAt(i + 1);
@@ -86,11 +92,6 @@ public class Main {
                 
                 System.out.println(result.toString().trim());
             }
-            else if (input.equals("pwd")) {
-                String currentDir = System.getProperty("user.dir");
-                System.out.println(currentDir);  // Output the directory path without the "$ "
-            }
-
             // Handle the pwd command
             else if (input.equals("pwd")) {
                 System.out.println(System.getProperty("user.dir")); // Print the current working directory
