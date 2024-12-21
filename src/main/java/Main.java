@@ -1,5 +1,5 @@
-import java.io.File;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,79 +7,45 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        Scanner scanner = new Scanner(System.in); // Initialize once
-        String pathEnv = System.getenv("PATH"); // Get the PATH environment variable
-        String homeDir = System.getenv("HOME"); // Get the HOME environment variable
-        String[] pathDirs = pathEnv.split(":"); // Split PATH into directories
+        Scanner scanner = new Scanner(System.in);
+        String pathEnv = System.getenv("PATH"); 
+        String homeDir = System.getenv("HOME");
+        String[] pathDirs = pathEnv.split(":");
 
         while (true) {
-            System.out.print("$ "); // Print prompt
-            String input = scanner.nextLine().trim(); // Get user input and trim leading/trailing spaces
+            System.out.print("$ ");
+            String input = scanner.nextLine().trim();
 
-            // Handle the exit command
             if (input.equals("exit") || input.equals("exit 0") || input.equals("0")) {
-                break; // Exit the loop and terminate the shell
+                break;
             }
-            // Handle the echo command
             else if (input.startsWith("echo ")) {
                 String echoText = input.substring(5);
                 StringBuilder result = new StringBuilder();
                 boolean inQuotes = false;
                 char quoteType = 0;
-                boolean lastWasQuote = false;
+                boolean backcount = echoText.contains("\\"+" "+"\\");
+                boolean singleback = echoText.contains("\\"+"n");
                 
                 for (int i = 0; i < echoText.length(); i++) {
                     char c = echoText.charAt(i);
-                    
-                    // Handle quotes
-                    if ((c == '\'' || c == '"') && (i == 0 || echoText.charAt(i - 1) != '\\')) {
-                        if (!inQuotes) {
-                            if (lastWasQuote && result.length() > 0 && result.charAt(result.length() - 1) != ' ') {
-                                result.append(' ');
-                            }
-                            inQuotes = true;
-                            quoteType = c;
-                            lastWasQuote = false;
-                            continue;
-                        } else if (c == quoteType) {
-                            inQuotes = false;
-                            quoteType = 0;
-                            lastWasQuote = true;
-                            continue;
-                        }
+                    if((c == '\\') && !inQuotes && singleback){
+                        continue;
                     }
-                    
-                    // For single quotes, preserve everything literally
-                    if (inQuotes && quoteType == '\'') {
-                        result.append(c);
+                    if((c == '\\') && !inQuotes && backcount){
+                        result.append(' ');
+                        continue;
+                    }
+                    if ((c == '\'' || c == '"') && !inQuotes) {
+                        inQuotes = true;
+                        quoteType = c;
+                        continue;
+                    } else if (c == quoteType && inQuotes) {
+                        inQuotes = false;
+                        quoteType = 0;
                         continue;
                     }
                     
-                    // Handle backslashes
-                    if (c == '\\') {
-                        if (inQuotes && quoteType == '"') {
-                            // Within double quotes, preserve backslashes
-                            result.append(c);
-                        } else if (!inQuotes) {
-                            // Outside quotes, check next character
-                            if (i + 1 < echoText.length()) {
-                                char nextChar = echoText.charAt(i + 1);
-                                if (nextChar == ' ' || nextChar == '\\') {
-                                    // Convert to space for space or backslash
-                                    result.append(' ');
-                                    if (nextChar == ' ') i++; // Skip next space
-                                } else {
-                                    // For other characters after backslash, just append the character
-                                    result.append(nextChar);
-                                    i++; // Skip the escaped character
-                                }
-                            }
-                        }
-                        lastWasQuote = false;
-                        continue;
-                    }
-                    
-                    // Handle spaces between quotes
                     if (c == ' ' && !inQuotes) {
                         if (result.length() > 0 && result.charAt(result.length() - 1) != ' ') {
                             result.append(' ');
@@ -87,41 +53,36 @@ public class Main {
                     } else {
                         result.append(c);
                     }
-                    lastWasQuote = false;
                 }
                 
                 System.out.println(result.toString().trim());
             }
-            // Handle the pwd command
             else if (input.equals("pwd")) {
-                System.out.println(System.getProperty("user.dir")); // Print the current working directory
+                System.out.println(System.getProperty("user.dir"));
             }
-            // Handle the cd command
             else if (input.startsWith("cd ")) {
-                String path = input.substring(3).trim(); // Extract the path after "cd "
+                String path = input.substring(3).trim();
                 File dir;
 
                 if (path.equals("~")) {
-                    dir = new File(homeDir); // Change to the home directory
+                    dir = new File(homeDir);
                 } else if (path.startsWith("/")) {
-                    dir = new File(path); // Absolute path
+                    dir = new File(path);
                 } else {
-                    dir = new File(System.getProperty("user.dir"), path); // Relative path
+                    dir = new File(System.getProperty("user.dir"), path);
                 }
 
                 if (dir.exists() && dir.isDirectory()) {
-                    System.setProperty("user.dir", dir.getCanonicalPath()); // Change the current directory
+                    System.setProperty("user.dir", dir.getCanonicalPath());
                 } else {
                     System.out.println("cd: " + path + ": No such file or directory");
                 }
-            } 
-            // Handle the type command for built-ins
+            }
             else if (input.startsWith("type ")) {
                 String command = input.substring(5).trim();
                 if (command.equals("echo") || command.equals("exit") || command.equals("type") || command.equals("pwd") || command.equals("cd")) {
                     System.out.println(command + " is a shell builtin");
                 } else {
-                    // Search for the command in PATH directories
                     boolean found = false;
                     for (String dir : pathDirs) {
                         File file = new File(dir, command);
@@ -135,37 +96,57 @@ public class Main {
                         System.out.println(command + ": not found");
                     }
                 }
-            } 
-            // Handle the cat command
-            else if (input.startsWith("cat")) {
-                String[] commandParts = splitCommand(input); // Split command into parts
+            }
+            else if (input.startsWith("cat ")) {
+                String[] commandParts = parseCommandWithQuotes(input);
                 if (commandParts.length > 1) {
-                    ArrayList<String> filePaths = new ArrayList<>(); // List to store file paths
+                    ArrayList<String> filePaths = new ArrayList<>();
+                    
                     for (int i = 1; i < commandParts.length; i++) {
-                        // Remove surrounding quotes and add to the list
-                        String filePath = commandParts[i].replaceAll("^['\"]|['\"]$", "");
+                        String filePath = commandParts[i];
+                        // Remove surrounding quotes if present
+                        if ((filePath.startsWith("'") && filePath.endsWith("'")) ||
+                            (filePath.startsWith("\"") && filePath.endsWith("\""))) {
+                            filePath = filePath.substring(1, filePath.length() - 1);
+                        }
                         filePaths.add(filePath);
                     }
 
-                    // Process the files and get the concatenated result
-                    String result = processFiles(filePaths.toArray(new String[0]));
-                    System.out.println(result); // Print the final result
+                    if (!filePaths.isEmpty()) {
+                        StringBuilder result = new StringBuilder();
+                        boolean firstFile = true;
+
+                        for (String filePath : filePaths) {
+                            try {
+                                String content = readFile(new File(filePath));
+                                if (!firstFile) {
+                                    //result.append(".");
+                                }
+                                result.append(content);
+                                firstFile = false;
+                            } catch (IOException e) {
+                                System.out.println("cat: " + filePath + ": No such file or directory");
+                                return;  // Exit on first error
+                            }
+                        }
+
+                        if (result.length() > 0) {
+                            System.out.println(result.toString());
+                        }
+                    }
                 } else {
                     System.out.println("cat: missing file operand");
                 }
             }
-            // Handle external commands
             else {
-                String[] commandParts = splitCommand(input); // Handle quoted arguments
-                String command = commandParts[0]; // First part is the command
+                String[] commandParts = splitCommand(input);
+                String command = commandParts[0];
 
-                // Search for the command in PATH directories
                 boolean found = false;
                 for (String dir : pathDirs) {
                     File file = new File(dir, command);
                     if (file.exists() && file.isFile() && file.canExecute()) {
                         found = true;
-
                         try {
                             ProcessBuilder processBuilder = new ProcessBuilder(commandParts);
                             processBuilder.redirectErrorStream(true);
@@ -177,7 +158,7 @@ public class Main {
                                 output.append(processScanner.nextLine()).append("\n");
                             }
                             processScanner.close();
-                            System.out.print(output.toString()); // Print the captured output
+                            System.out.print(output.toString());
 
                             process.waitFor();
                         } catch (Exception e) {
@@ -193,21 +174,76 @@ public class Main {
         }
     }
 
+    private static String[] parseCommandWithQuotes(String input) {
+        ArrayList<String> parts = new ArrayList<>();
+        StringBuilder currentPart = new StringBuilder();
+        boolean inQuotes = false;
+        char quoteChar = 0;
+        
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            
+            if (c == '\'' || c == '"') {
+                if (!inQuotes) {
+                    if (currentPart.length() > 0 && !Character.isWhitespace(currentPart.charAt(currentPart.length() - 1))) {
+                        parts.add(currentPart.toString());
+                        currentPart = new StringBuilder();
+                    }
+                    inQuotes = true;
+                    quoteChar = c;
+                    currentPart.append(c);
+                } else if (c == quoteChar) {
+                    currentPart.append(c);
+                    parts.add(currentPart.toString());
+                    currentPart = new StringBuilder();
+                    inQuotes = false;
+                } else {
+                    currentPart.append(c);
+                }
+            } else if (Character.isWhitespace(c) && !inQuotes) {
+                if (currentPart.length() > 0) {
+                    parts.add(currentPart.toString());
+                    currentPart = new StringBuilder();
+                }
+            } else {
+                currentPart.append(c);
+            }
+        }
+        
+        if (currentPart.length() > 0) {
+            parts.add(currentPart.toString());
+        }
+        
+        return parts.toArray(new String[0]);
+    }
+
     private static String[] splitCommand(String input) {
         ArrayList<String> parts = new ArrayList<>();
         StringBuilder currentPart = new StringBuilder();
-        boolean inQuote = false;
-        char quoteChar = 0;
+        boolean inQuotes = false;
+        char quoteType = 0;
+        boolean escaped = false;
 
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
 
-            if ((c == '"' || c == '\'') && (quoteChar == 0 || quoteChar == c)) {
-                // Toggle quoting state
-                inQuote = !inQuote;
-                quoteChar = inQuote ? c : 0;
-            } else if (!inQuote && c == ' ') {
-                // Split on spaces outside quotes
+            if (escaped) {
+                currentPart.append(c);
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                currentPart.append(c);
+                continue;
+            }
+
+            if ((c == '"' || c == '\'') && (quoteType == 0 || quoteType == c)) {
+                inQuotes = !inQuotes;
+                quoteType = inQuotes ? c : 0;
+                currentPart.append(c);
+            } else if (c == ' ' && !inQuotes) {
                 if (currentPart.length() > 0) {
                     parts.add(currentPart.toString());
                     currentPart.setLength(0);
@@ -224,47 +260,19 @@ public class Main {
         return parts.toArray(new String[0]);
     }
 
-    // Helper method to process input, handle quotes and escape sequences
-
-    // Process the files and concatenate them with periods in between
-    public static String processFiles(String[] filePaths) throws IOException {
-        StringBuilder result = new StringBuilder();
-        boolean firstNonEmptyFile = true;
-
-        for (String filePath : filePaths) {
-            File file = new File(filePath);
-            if (file.exists() && file.isFile()) {
-                String fileContent = readFile(file); // Read the file content
-
-                if (!fileContent.isEmpty()) {
-                    // Remove consecutive dots and replace with a single dot only at the boundaries
-                    // (i.e., only between file contents)
-                    if (firstNonEmptyFile) {
-                        result.append(fileContent);
-                        firstNonEmptyFile = false;
-                    } else {
-                        result.append(".").append(fileContent);
-                    }
-                }
-            }
-        }
-
-        // After concatenating the contents of all files, remove any consecutive dots
-        String finalResult = result.toString().replaceAll("\\.+", ".").trim();
-
-        return finalResult;
-    }
-
-    // Read content of the file and return it as a string
     private static String readFile(File file) throws IOException {
         StringBuilder content = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
+            boolean firstLine = true;
             while ((line = reader.readLine()) != null) {
-                content.append(line).append("\n");
+                if (!firstLine) {
+                    content.append("\n");
+                }
+                content.append(line);
+                firstLine = false;
             }
         }
-        return content.toString().trim();
+        return content.toString();
     }
 }
-
